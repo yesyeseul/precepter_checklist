@@ -5,9 +5,12 @@ import { getChecklist } from '../../data/checklistData'
 import { ROLE_LABELS } from '../../types/userRole'
 import { downloadSession, readSessionFile } from '../../features/storage/jsonIO'
 import type { ChecklistSession } from '../../types/evaluation'
+import { gasSaveSession, gasListSessions, gasLoadSession } from '../../lib/googleDrive/gasClient'
+import type { SessionMeta } from '../../lib/googleDrive/gasClient'
 import ChecklistCard from './ChecklistCard'
 import LowScoreModal from '../common/LowScoreModal'
 import SignaturePad from '../signature/SignaturePad'
+import ServerLoadModal from '../common/ServerLoadModal'
 
 export default function ChecklistScreen() {
   const { role, weekType: rawWeekType, subject, reset } = useAppContext()
@@ -32,9 +35,14 @@ export default function ChecklistScreen() {
   const [pendingScore, setPendingScore] = useState(0)
   const [lowScoreReason, setLowScoreReason] = useState('')
 
-  // 서명 관련 상태 (최종 / 일괄)
   const [signMode, setSignMode] = useState<'final' | 'batch' | null>(null)
   const [signerName, setSignerName] = useState('')
+
+  // 서버 연동 상태
+  const [serverStatus, setServerStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [showServerLoad, setShowServerLoad] = useState(false)
+  const [serverSessions, setServerSessions] = useState<SessionMeta[]>([])
+  const [serverLoadError, setServerLoadError] = useState('')
 
   const doneCount = useMemo(() => {
     const field = role === 'preceptee' ? 'preceptee'
@@ -72,6 +80,39 @@ export default function ChecklistScreen() {
     downloadSession(buildSession(extra))
   }
 
+  async function handleServerSave() {
+    setServerStatus('saving')
+    try {
+      await gasSaveSession(buildSession())
+      setServerStatus('saved')
+      setTimeout(() => setServerStatus('idle'), 2000)
+    } catch {
+      setServerStatus('error')
+      setTimeout(() => setServerStatus('idle'), 3000)
+    }
+  }
+
+  async function handleServerLoadOpen() {
+    setServerLoadError('')
+    setShowServerLoad(true)
+    try {
+      const list = await gasListSessions()
+      setServerSessions(list)
+    } catch (err) {
+      setServerLoadError(err instanceof Error ? err.message : '서버 오류')
+    }
+  }
+
+  async function handleServerLoadSelect(fileId: string) {
+    try {
+      const session = await gasLoadSession(fileId)
+      loadFromSession(session)
+      setShowServerLoad(false)
+    } catch (err) {
+      setServerLoadError(err instanceof Error ? err.message : '불러오기 실패')
+    }
+  }
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -106,14 +147,12 @@ export default function ChecklistScreen() {
     const name = signerName.trim()
 
     if (signMode === 'final') {
-      // 수간호사 전체 일괄 적용
       results.forEach(r => {
         updateEvaluation(r.itemId, 'headNurse', { signatureImage: dataUrl, signerName: name, signedAt: now })
       })
       setSignMode(null)
       handleDownload({ lowScoreReason: lowScoreReason || undefined })
     } else if (signMode === 'batch') {
-      // 점수가 입력된 문항에만 현재 역할 서명 일괄 적용
       const field = role === 'preceptee' ? 'preceptee'
         : role === 'preceptor' ? 'preceptor'
         : role === 'educator' ? 'educator'
@@ -129,6 +168,16 @@ export default function ChecklistScreen() {
   }
 
   const headerInfo = `${subject.name} · ${subject.employeeId ? subject.employeeId + ' · ' : ''}${subject.department}`
+
+  const serverBtnLabel =
+    serverStatus === 'saving' ? '저장중...' :
+    serverStatus === 'saved' ? '저장완료!' :
+    serverStatus === 'error' ? '오류' : '서버저장'
+
+  const serverBtnClass =
+    serverStatus === 'saved' ? 'text-xs text-white bg-emerald-500 rounded-lg px-2 py-1' :
+    serverStatus === 'error' ? 'text-xs text-white bg-red-500 rounded-lg px-2 py-1' :
+    'text-xs text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg px-2 py-1'
 
   return (
     <>
@@ -155,10 +204,23 @@ export default function ChecklistScreen() {
                   불러오기
                 </button>
                 <button
+                  onClick={handleServerLoadOpen}
+                  className="text-xs text-indigo-600 border border-indigo-200 rounded-lg px-2 py-1 hover:bg-indigo-50"
+                >
+                  서버불러오기
+                </button>
+                <button
                   onClick={() => handleDownload()}
                   className="text-xs text-white bg-blue-500 hover:bg-blue-600 rounded-lg px-2 py-1"
                 >
                   저장
+                </button>
+                <button
+                  onClick={handleServerSave}
+                  disabled={serverStatus === 'saving'}
+                  className={serverBtnClass}
+                >
+                  {serverBtnLabel}
                 </button>
                 <button
                   onClick={() =>
@@ -241,6 +303,15 @@ export default function ChecklistScreen() {
           onCancel={() => setSignMode(null)}
           signerName={signerName}
           onSignerNameChange={setSignerName}
+        />
+      )}
+
+      {showServerLoad && (
+        <ServerLoadModal
+          sessions={serverSessions}
+          error={serverLoadError}
+          onSelect={handleServerLoadSelect}
+          onClose={() => setShowServerLoad(false)}
         />
       )}
     </>
