@@ -11,6 +11,7 @@ import LowScoreModal from '../common/LowScoreModal'
 import SignaturePad from '../signature/SignaturePad'
 import ServerLoadModal from '../common/ServerLoadModal'
 import SaveCompleteModal from '../common/SaveCompleteModal'
+import SavingModal from '../common/SavingModal'
 import FinalSubmitModal from '../common/FinalSubmitModal'
 import UnansweredModal from '../common/UnansweredModal'
 import { buildUnifiedFileName } from '../../lib/excel/fileNames'
@@ -53,6 +54,7 @@ export default function ChecklistScreen() {
   const [signerName, setSignerName] = useState('')
 
   const [serverStatus, setServerStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [showSaving, setShowSaving] = useState(false)
   const [showSaveComplete, setShowSaveComplete] = useState(false)
   const [showServerLoad, setShowServerLoad] = useState(false)
   const [serverSessions, setServerSessions] = useState<SessionMeta[]>([])
@@ -196,6 +198,7 @@ export default function ChecklistScreen() {
       return
     }
     setServerStatus('saving')
+    setShowSaving(true)
     try {
       const session = buildSession()
       const { tempJson, tempXlsx } = buildFileNames()
@@ -207,9 +210,11 @@ export default function ChecklistScreen() {
       } catch {
         await gasSaveSession(session, tempJson)
       }
+      setShowSaving(false)
       setServerStatus('saved')
       setShowSaveComplete(true)
     } catch {
+      setShowSaving(false)
       setServerStatus('error')
       setTimeout(() => setServerStatus('idle'), 3000)
     }
@@ -328,6 +333,7 @@ export default function ChecklistScreen() {
       lowScoreReason: lowScoreReason || undefined,
     })
     await handleServerSaveWithExcel(finalSession)
+    reset()
   }
 
   async function handleSignSave(dataUrl: string) {
@@ -608,6 +614,8 @@ export default function ChecklistScreen() {
           onClose={() => setShowServerLoad(false)}
         />
       )}
+
+      {showSaving && <SavingModal />}
 
       {showSaveComplete && (
         <SaveCompleteModal
