@@ -1,8 +1,10 @@
+import type { Role } from './userRole'
+
 export type Evaluation = {
   score: number | null
-  memo: string
+  educationDate: string
   signerName: string
-  signatureImage: string | null
+  signatureImage: string | null  // base64
   signedAt: string | null
 }
 
@@ -14,22 +16,35 @@ export type ChecklistItemResult = {
   headNurse: Evaluation
 }
 
+export type SurveyMeta = {
+  department: string
+  deploymentDate: string
+  educationPeriodStart: string
+  educationPeriodEnd: string
+}
+
 export type ChecklistSession = {
   id: string
   targetName: string
   employeeId?: string
+  preceptorId?: string
   preceptorName?: string
+  educatorId?: string
+  educatorPersonName?: string  // 교육전담 성명
+  headNurseName?: string
   weekType: import('./checklist').WeekType
-  department: string
-  startDate: string
+  department: string    // kept for backward compat
+  startDate: string     // kept for backward compat
+  surveyMeta?: SurveyMeta
   results: ChecklistItemResult[]
   savedAt: string
   lowScoreReason?: string
+  submittedRoles?: Partial<Record<Role, string>>  // role → ISO timestamp
 }
 
 export const createEmptyEvaluation = (): Evaluation => ({
   score: null,
-  memo: '',
+  educationDate: '',
   signerName: '',
   signatureImage: null,
   signedAt: null,

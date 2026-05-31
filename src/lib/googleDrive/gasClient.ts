@@ -18,30 +18,31 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 /**
- * JSON + XLSX 둘 다 Drive에 저장.
+ * JSON + XLSX 둘 다 Drive의 대상자 폴더에 저장.
  * text/plain body → GAS e.postData.contents 로 수신.
  */
 export async function gasSaveWithExcel(
   session: ChecklistSession,
   xlsxBuffer: ArrayBuffer,
   xlsxFileName: string,
+  subjectFolderName: string,
 ): Promise<void> {
   const xlsxBase64 = arrayBufferToBase64(xlsxBuffer)
   await fetch(GAS_URL, {
     method: 'POST',
     mode: 'no-cors',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ session, xlsxBase64, xlsxFileName }),
+    body: JSON.stringify({ session, xlsxBase64, xlsxFileName, subjectFolderName }),
   })
 }
 
-/** JSON만 저장 (XLSX 생성 불가한 경우 fallback) */
+/** JSON만 임시저장 폴더에 저장 */
 export async function gasSaveSession(session: ChecklistSession): Promise<void> {
   await fetch(GAS_URL, {
     method: 'POST',
     mode: 'no-cors',
     headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ session }),
+    body: JSON.stringify({ session, folderType: 'temp' }),
   })
 }
 
