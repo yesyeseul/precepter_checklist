@@ -6,7 +6,7 @@
 
 ## 🔗 배포 URL
 
-> **https://yoonju977.github.io/precepter_checklist/**
+> **https://yesyeseul.github.io/precepter_checklist/**
 
 PC와 모바일 모두 접속 가능합니다. 별도 설치 없이 브라우저에서 바로 사용합니다.
 
